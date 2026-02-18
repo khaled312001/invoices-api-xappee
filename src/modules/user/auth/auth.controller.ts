@@ -101,7 +101,7 @@ export const handleCallback = async (req: any, res: Response) => {
 
         if (existingUser) {
           existingUser = await updateUserAccount({
-            ...existingUser,
+            _id: existingUser._id,
             ...syncData,
           });
         } else {
@@ -125,7 +125,7 @@ export const handleCallback = async (req: any, res: Response) => {
       // If it's deleted reactivate the account & sign him in
       const reactivatedUser = await updateUserAccount({
         ...existingUser,
-        _id: new mongoose.Types.ObjectId(),
+        _id: existingUser._id, // Ensure we keep the SAME ID
         reactivated: true,
         status: "active",
       });

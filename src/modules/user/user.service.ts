@@ -46,14 +46,14 @@ export async function deleteUser(userId: string): Promise<any> {
 }
 
 export async function updateUserAccount(user: Partial<IUser>): Promise<any> {
-  return User.findOneAndUpdate({ _id: user._id }, user).exec();
+  return User.findOneAndUpdate({ _id: user._id }, user, { new: true }).exec();
 }
 
-export async function updateUser(user: any,id: string): Promise<any> {
-  console.log("id", id );
-  console.log("user", user );
+export async function updateUser(user: any, id: string): Promise<any> {
+  console.log("id", id);
+  console.log("user", user);
 
-  return User.findOneAndUpdate({ _id: id }, user).exec();
+  return User.findOneAndUpdate({ _id: id }, user, { new: true }).exec();
 }
 
 export async function findUserByEmail(email: string): Promise<IUser | any> {
