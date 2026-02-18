@@ -30,10 +30,17 @@ passport.use("local", passportLocalStrategyMiddleware);
 
 app.use(express.json());
 
+// Export the app for Vercel
+export default app;
+
+// Connect to MongoDB
 connectMongoDB();
 
 app.use("/api", router);
 
-app.listen(PORT, () => {
-  console.log(`Server is up and running at ${process.env.SERVER}:${PORT}`);
-});
+// Only listen if not running in Vercel (Vercel handles the server)
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`Server is up and running at ${process.env.SERVER || 'http://localhost'}:${PORT}`);
+  });
+}
