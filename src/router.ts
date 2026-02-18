@@ -12,22 +12,46 @@ import { verifyAdmin, verifyUser } from "./middleware/authentication.middleware"
 const router = express.Router();
 
 router.use("/auth", authRouter);
-router.use("/users", verifyUser,verifyAdmin, userRouter);
+router.use("/users", verifyUser, verifyAdmin, userRouter);
 router.use("/channels", verifyUser, channelRouter);
 router.use("/carriers", verifyUser, carrierRouter);
 router.use("/items", verifyUser, ItemRouter);
-router.use("/orders", verifyUser,verifyAdmin, orderRouter);
+router.use("/orders", verifyUser, verifyAdmin, orderRouter);
 router.use("/invoices", verifyUser, invoiceRouter);
-router.use("/clients", verifyUser,verifyAdmin, clientRouter);
+router.use("/clients", verifyUser, verifyAdmin, clientRouter);
 
-// router.get("/migrate/items", async (req, res) => {
-//   try {
-//     await migrateUpdateItems();
-//     res.status(200).json({ message: "Database migration successful" });
-//   } catch (err: any) {
-//     console.error(err);
-//   }
-//   res.status(200).json({ message: "Server is up and running" });
-// });
+router.get("/health-check", async (req, res) => {
+    try {
+        const mongoose = require("mongoose");
+        const dbStatus = mongoose.connection.readyState;
+        const statusMap: Record<number, string> = {
+            0: "disconnected",
+            1: "connected",
+            2: "connecting",
+            3: "disconnecting",
+        };
+
+        res.status(200).json({
+            status: "success",
+            message: "Server is up and running",
+            database: {
+                status: statusMap[dbStatus] || "unknown",
+                readyState: dbStatus,
+            },
+            env: {
+                NODE_ENV: process.env.NODE_ENV,
+                SERVER: process.env.SERVER,
+                ORIGIN: process.env.ORIGIN,
+                MONGODB_URI: process.env.MONGODB_URI ? "LOADED (MASKED)" : "NOT LOADED",
+            },
+            timestamp: new Date().toISOString(),
+        });
+    } catch (err: any) {
+        res.status(500).json({
+            status: "error",
+            message: err.message,
+        });
+    }
+});
 
 export default router;
