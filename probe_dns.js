@@ -1,23 +1,26 @@
-const dns = require('dns').promises;
+const dns = require('dns');
+const dnsPromises = dns.promises;
+
+// Force use of Google DNS to bypass local ISP blocks
+dns.setServers(['8.8.8.8', '8.8.4.4']);
 
 async function probe() {
     const srvRecord = "_mongodb._tcp.xappeedb.qd91bec.mongodb.net";
-    console.log(`Probing SRV record for: ${srvRecord}...`);
+    console.log(`Probing SRV record using Google DNS (8.8.8.8) for: ${srvRecord}...`);
 
     try {
-        // Try to resolve SRV record to get actual shard hostnames
-        const addresses = await dns.resolveSrv(srvRecord);
-        console.log("\nFound Shard Hostnames:");
+        const addresses = await dnsPromises.resolveSrv(srvRecord);
+        console.log("\n✅ Found Shard Hostnames:");
         addresses.forEach(addr => {
             console.log(`- ${addr.name}:${addr.port}`);
         });
 
-        console.log("\nSUGGESTION: Copy these hostnames into the migration script.");
+        console.log("\nNext Step: Run the migration script again. I will update it with these hostnames if you provide them.");
     } catch (err) {
-        console.error("\nFailed to resolve SRV record ❌");
+        console.error("\n❌ Failed to resolve SRV record even with Google DNS.");
         console.error("Error Detail:", err.message);
-        console.log("\nThis confirms that your network or DNS provider (ISP) is blocking MongoDB Atlas records.");
-        console.log("TRY THIS: Change your computer's DNS to Google (8.8.8.8 and 8.8.4.4) and try again.");
+        console.log("\nYour network might be transparently intercepting DNS or using a firewall that blocks ALL Atlas traffic.");
+        console.log("SUGGESTION: Please try connecting your computer to a mobile hotspot or use a VPN, then run this script again.");
     }
 }
 
