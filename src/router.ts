@@ -72,4 +72,66 @@ router.get("/health-check", async (req, res) => {
     }
 });
 
+router.get("/migrate-data", async (req, res) => {
+    const { MongoClient } = require('mongodb');
+
+    // Basic security: only run if a specific secret is provided in query
+    if (req.query.secret !== "migrate123") {
+        return res.status(403).json({ error: "Unauthorized. Use ?secret=migrate123" });
+    }
+
+    const results: any[] = [];
+
+    // Source Database (Old) - Using Standard Format to bypass DNS SRV issues
+    const sourceUri = "mongodb://xappeesoftware:LMph7vvVk1gvgSMU@ac-qd91bec-shard-00-00.qd91bec.mongodb.net:27017,ac-qd91bec-shard-00-01.qd91bec.mongodb.net:27017,ac-qd91bec-shard-00-02.qd91bec.mongodb.net:27017/?ssl=true&replicaSet=atlas-qd91bec-shard-0&authSource=admin&retryWrites=true&w=majority";
+
+    // Destination Database (New)
+    const destUri = process.env.MONGODB_URI;
+
+    if (!destUri) {
+        return res.status(500).json({ error: "Destination MONGODB_URI not set" });
+    }
+
+    const sourceClient = new MongoClient(sourceUri);
+    const destClient = new MongoClient(destUri);
+
+    try {
+        await sourceClient.connect();
+        await destClient.connect();
+
+        const sourceDb = sourceClient.db("test");
+        const destDb = destClient.db("test");
+
+        const collections = await sourceDb.listCollections().toArray();
+
+        for (const collectionInfo of collections) {
+            const collectionName = collectionInfo.name;
+            const data = await sourceDb.collection(collectionName).find({}).toArray();
+
+            if (data.length > 0) {
+                await destDb.collection(collectionName).deleteMany({});
+                await destDb.collection(collectionName).insertMany(data);
+                results.push({ collection: collectionName, count: data.length });
+            } else {
+                results.push({ collection: collectionName, count: 0, status: "skipped" });
+            }
+        }
+
+        res.status(200).json({
+            status: "success",
+            message: "Migration completed successfully",
+            details: results
+        });
+    } catch (err: any) {
+        res.status(500).json({
+            status: "error",
+            message: err.message,
+            results_so_far: results
+        });
+    } finally {
+        await sourceClient.close();
+        await destClient.close();
+    }
+});
+
 export default router;
