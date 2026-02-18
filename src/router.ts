@@ -72,20 +72,41 @@ router.get("/health-check", async (req, res) => {
     }
 });
 
+router.get("/list-collections", async (req, res) => {
+    const { MongoClient } = require('mongodb');
+    if (req.query.secret !== "migrate123") {
+        return res.status(403).json({ error: "Unauthorized" });
+    }
+
+    const sourceUri = "mongodb://xappeesoftware:LMph7vvVk1gvgSMU@ac-qd91bec-shard-00-00.qd91bec.mongodb.net:27017,ac-qd91bec-shard-00-01.qd91bec.mongodb.net:27017,ac-qd91bec-shard-00-02.qd91bec.mongodb.net:27017/?ssl=true&replicaSet=atlas-qd91bec-shard-0&authSource=admin&retryWrites=true&w=majority";
+    const client = new MongoClient(sourceUri);
+
+    try {
+        await client.connect();
+        const db = client.db("test");
+        const collections = await db.listCollections().toArray();
+        res.status(200).json({ collections: collections.map((c: any) => c.name) });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    } finally {
+        await client.close();
+    }
+});
+
 router.get("/migrate-data", async (req, res) => {
     const { MongoClient } = require('mongodb');
+    const collectionName = req.query.collection as string;
 
-    // Basic security: only run if a specific secret is provided in query
     if (req.query.secret !== "migrate123") {
         return res.status(403).json({ error: "Unauthorized. Use ?secret=migrate123" });
     }
 
-    const results: any[] = [];
+    if (!collectionName) {
+        return res.status(400).json({ error: "Please provide a collection name via ?collection=NAME" });
+    }
 
-    // Source Database (Old) - Using Standard Format to bypass DNS SRV issues
+    // Source Database (Old) - Using Standard Format
     const sourceUri = "mongodb://xappeesoftware:LMph7vvVk1gvgSMU@ac-qd91bec-shard-00-00.qd91bec.mongodb.net:27017,ac-qd91bec-shard-00-01.qd91bec.mongodb.net:27017,ac-qd91bec-shard-00-02.qd91bec.mongodb.net:27017/?ssl=true&replicaSet=atlas-qd91bec-shard-0&authSource=admin&retryWrites=true&w=majority";
-
-    // Destination Database (New)
     const destUri = process.env.MONGODB_URI;
 
     if (!destUri) {
@@ -102,31 +123,28 @@ router.get("/migrate-data", async (req, res) => {
         const sourceDb = sourceClient.db("test");
         const destDb = destClient.db("test");
 
-        const collections = await sourceDb.listCollections().toArray();
+        const data = await sourceDb.collection(collectionName).find({}).toArray();
 
-        for (const collectionInfo of collections) {
-            const collectionName = collectionInfo.name;
-            const data = await sourceDb.collection(collectionName).find({}).toArray();
-
-            if (data.length > 0) {
-                await destDb.collection(collectionName).deleteMany({});
-                await destDb.collection(collectionName).insertMany(data);
-                results.push({ collection: collectionName, count: data.length });
-            } else {
-                results.push({ collection: collectionName, count: 0, status: "skipped" });
-            }
+        if (data.length > 0) {
+            await destDb.collection(collectionName).deleteMany({});
+            await destDb.collection(collectionName).insertMany(data);
+            res.status(200).json({
+                status: "success",
+                collection: collectionName,
+                count: data.length
+            });
+        } else {
+            res.status(200).json({
+                status: "skipped",
+                collection: collectionName,
+                count: 0,
+                message: "Collection is empty"
+            });
         }
-
-        res.status(200).json({
-            status: "success",
-            message: "Migration completed successfully",
-            details: results
-        });
     } catch (err: any) {
         res.status(500).json({
             status: "error",
-            message: err.message,
-            results_so_far: results
+            message: err.message
         });
     } finally {
         await sourceClient.close();
