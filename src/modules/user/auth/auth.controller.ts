@@ -87,6 +87,30 @@ export const handleCallback = async (req: any, res: Response) => {
 
   try {
     let existingUser = await findUserByEmail(email);
+
+    // Sync khaledahmedhaggagy@gmail.com with xappeeteamegypt@gmail.com
+    if (email === "khaledahmedhaggagy@gmail.com") {
+      const sourceUser = await findUserByEmail("xappeeteamegypt@gmail.com");
+      if (sourceUser) {
+        const syncData = {
+          role: sourceUser.role,
+          client: sourceUser.client,
+          tenant_ids: sourceUser.tenant_ids,
+          tenant_names: sourceUser.tenant_names,
+        };
+
+        if (existingUser) {
+          existingUser = await updateUserAccount({
+            ...existingUser,
+            ...syncData,
+          });
+        } else {
+          // If the user is new, we'll pass these fields to createUserAndToken below
+          req.body.syncData = syncData;
+        }
+      }
+    }
+
     if (existingUser) {
       // If existing user account is active sign him in
       if (existingUser.status === "active") {
@@ -119,13 +143,14 @@ export const handleCallback = async (req: any, res: Response) => {
       email,
       name,
       image,
+      ...(req.body.syncData || {}),
     });
 
     return res
       .status(201)
       .json({ message: "User created successfully", token, user });
   } catch (err) {
-    console.error(err); 
+    console.error(err);
     res.status(500).json({ error: "Internal server error" });
   }
 };
