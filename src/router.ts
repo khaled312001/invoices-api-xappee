@@ -25,9 +25,14 @@ router.get("/health-check", async (req, res) => {
         const mongoose = require("mongoose");
 
         // If disconnected, try to connect again (useful for serverless)
+        let connectionError = null;
         if (mongoose.connection.readyState === 0) {
-            const { connectMongoDB } = require("./config/mongoose");
-            await connectMongoDB();
+            try {
+                const { connectMongoDB } = require("./config/mongoose");
+                await connectMongoDB();
+            } catch (err: any) {
+                connectionError = err.message;
+            }
         }
 
         const dbStatus = mongoose.connection.readyState;
@@ -39,12 +44,13 @@ router.get("/health-check", async (req, res) => {
         };
 
         res.status(200).json({
-            status: "success",
-            message: "Server is up and running",
+            status: connectionError ? "warning" : "success",
+            message: connectionError ? `Connection Failed: ${connectionError}` : "Server is up and running",
             database: {
                 status: statusMap[dbStatus] || "unknown",
                 readyState: dbStatus,
                 host: mongoose.connection.host,
+                error: connectionError
             },
             env_debug: {
                 NODE_ENV: process.env.NODE_ENV,

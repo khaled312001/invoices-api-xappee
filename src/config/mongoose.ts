@@ -18,10 +18,10 @@ export const connectMongoDB = async () => {
       serverSelectionTimeoutMS: 5000,
     });
     console.log("Successfully connected to MongoDB");
+    return mongoose.connection;
   } catch (e: any) {
     console.error("Failed to connect to MongoDB:", e.message);
-    // In serverless, we don't necessarily want to setTimeout retry 
-    // because the function will just timeout itself or be killed.
+    throw e; // Rethrow to allow health-check to capture the error
   }
 };
 

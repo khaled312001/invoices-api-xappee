@@ -30,9 +30,6 @@ passport.use("local", passportLocalStrategyMiddleware);
 
 app.use(express.json());
 
-// Export the app for Vercel
-export default app;
-
 // Connect to MongoDB
 connectMongoDB();
 
@@ -44,3 +41,6 @@ if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
     console.log(`Server is up and running at ${process.env.SERVER || 'http://localhost'}:${PORT}`);
   });
 }
+
+// Export the app for Vercel
+export default app;
