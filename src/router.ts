@@ -23,6 +23,13 @@ router.use("/clients", verifyUser, verifyAdmin, clientRouter);
 router.get("/health-check", async (req, res) => {
     try {
         const mongoose = require("mongoose");
+
+        // If disconnected, try to connect again (useful for serverless)
+        if (mongoose.connection.readyState === 0) {
+            const { connectMongoDB } = require("./config/mongoose");
+            await connectMongoDB();
+        }
+
         const dbStatus = mongoose.connection.readyState;
         const statusMap: Record<number, string> = {
             0: "disconnected",
@@ -37,12 +44,14 @@ router.get("/health-check", async (req, res) => {
             database: {
                 status: statusMap[dbStatus] || "unknown",
                 readyState: dbStatus,
+                host: mongoose.connection.host,
             },
-            env: {
+            env_debug: {
                 NODE_ENV: process.env.NODE_ENV,
+                VERCEL: process.env.VERCEL,
+                HAS_MONGODB_URI: !!process.env.MONGODB_URI,
                 SERVER: process.env.SERVER,
                 ORIGIN: process.env.ORIGIN,
-                MONGODB_URI: process.env.MONGODB_URI ? "LOADED (MASKED)" : "NOT LOADED",
             },
             timestamp: new Date().toISOString(),
         });
@@ -50,6 +59,7 @@ router.get("/health-check", async (req, res) => {
         res.status(500).json({
             status: "error",
             message: err.message,
+            stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
         });
     }
 });
