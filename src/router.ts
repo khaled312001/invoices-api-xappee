@@ -51,7 +51,8 @@ router.get("/health-check", async (req, res) => {
                 status: statusMap[dbStatus] || "unknown",
                 readyState: dbStatus,
                 host: mongoose.connection.host,
-                error: connectionError || (dbStatus === 0 ? "Not connected yet" : null)
+                error: connectionError || (dbStatus === 0 ? "Not connected yet" : null),
+                uri_check: process.env.MONGODB_URI ? `${process.env.MONGODB_URI.substring(0, 15)}...` : "Empty"
             },
             env_debug: {
                 NODE_ENV: process.env.NODE_ENV,

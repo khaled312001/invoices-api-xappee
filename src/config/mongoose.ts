@@ -2,12 +2,18 @@ const mongoose = require("mongoose");
 require("dotenv").config();
 
 export const connectMongoDB = async () => {
-  const mongoURI = process.env.MONGODB_URI;
+  let mongoURI = process.env.MONGODB_URI;
 
   if (!mongoURI) {
     console.error("MONGODB_URI is not defined in environment variables");
     return;
   }
+
+  // Auto-trim to prevent "Invalid scheme" errors from hidden spaces
+  mongoURI = mongoURI.trim();
+
+  // Log masked URI for debugging scheme issues
+  console.log(`Connecting to MongoDB with scheme: ${mongoURI.substring(0, 15)}...`);
 
   if (mongoose.connection.readyState === 1) {
     return mongoose.connection;
