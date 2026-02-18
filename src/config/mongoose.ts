@@ -22,8 +22,7 @@ export const connectMongoDB = async () => {
     return mongoose.connection;
   } catch (e: any) {
     console.error("Failed to connect to MongoDB:", e.message);
-    // Don't rethrow here if we want the app to keep running without a DB
-    // but the health check will still report it.
+    throw e; // Re-throw so the health-check can capture it
   }
 };
 
