@@ -43,6 +43,7 @@ yarn-error.log*
 # awstats
 /awstats-icon/
 /awstatsicons/
+/icon/
 
 # draft
 /draft/
