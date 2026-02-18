@@ -30,8 +30,10 @@ passport.use("local", passportLocalStrategyMiddleware);
 
 app.use(express.json());
 
-// Connect to MongoDB
-connectMongoDB();
+// Connect to MongoDB (Fire and forget, but catch potential errors)
+connectMongoDB().catch(err => {
+  console.error("Initial MongoDB connection failed:", err.message);
+});
 
 app.use("/api", router);
 

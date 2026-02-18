@@ -16,12 +16,14 @@ export const connectMongoDB = async () => {
   try {
     await mongoose.connect(mongoURI, {
       serverSelectionTimeoutMS: 5000,
+      connectTimeoutMS: 10000,
     });
     console.log("Successfully connected to MongoDB");
     return mongoose.connection;
   } catch (e: any) {
     console.error("Failed to connect to MongoDB:", e.message);
-    throw e; // Rethrow to allow health-check to capture the error
+    // Don't rethrow here if we want the app to keep running without a DB
+    // but the health check will still report it.
   }
 };
 
