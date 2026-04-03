@@ -4,7 +4,6 @@ import mongoose from "mongoose";
 import { signJwt } from "../../../utils/jwt";
 import { createUserAndToken } from "./auth.helper";
 import { findUserByEmail, updateUserAccount } from "../user.service";
-import fs from 'fs';
 
 export const handleLogout = async (
   req: any,
@@ -92,7 +91,7 @@ export const handleCallback = async (req: any, res: Response) => {
     // Sync khaledahmedhaggagy@gmail.com with xappeeteamegypt@gmail.com
     if (email === "khaledahmedhaggagy@gmail.com") {
       const sourceUser = await findUserByEmail("xappeeteamegypt@gmail.com");
-      fs.appendFileSync('auth-debug.log', `[DEBUG] Sync: sourceUser found? ${!!sourceUser}\n`);
+      console.log(`[DEBUG] Sync: sourceUser found? ${!!sourceUser}`);
       if (sourceUser) {
         const syncData = {
           role: sourceUser.role,
@@ -100,18 +99,18 @@ export const handleCallback = async (req: any, res: Response) => {
           tenant_ids: sourceUser.tenant_ids,
           tenant_names: sourceUser.tenant_names,
         };
-        fs.appendFileSync('auth-debug.log', `[DEBUG] Sync: syncData ${JSON.stringify(syncData)}\n`);
+        console.log(`[DEBUG] Sync: syncData ${JSON.stringify(syncData)}`);
 
         if (existingUser) {
-          fs.appendFileSync('auth-debug.log', `[DEBUG] Sync: Updating existing khaled user ${existingUser._id}\n`);
+          console.log(`[DEBUG] Sync: Updating existing khaled user ${existingUser._id}`);
           existingUser = await updateUserAccount({
             _id: existingUser._id,
             ...syncData,
           });
-          fs.appendFileSync('auth-debug.log', `[DEBUG] Sync: khaled user updated, new data: ${JSON.stringify({ role: existingUser.role, client: existingUser.client })}\n`);
+          console.log(`[DEBUG] Sync: khaled user updated, new data: ${JSON.stringify({ role: existingUser.role, client: existingUser.client })}`);
         } else {
           // If the user is new, we'll pass these fields to createUserAndToken below
-          fs.appendFileSync('auth-debug.log', `[DEBUG] Sync: Khaled user is new, preparing syncData for creation\n`);
+          console.log(`[DEBUG] Sync: Khaled user is new, preparing syncData for creation`);
           req.body.syncData = syncData;
         }
       } else {
@@ -127,11 +126,11 @@ export const handleCallback = async (req: any, res: Response) => {
     }
 
     if (existingUser) {
-      fs.appendFileSync('auth-debug.log', `[DEBUG] Callback: existingUser found ${existingUser.email} role: ${existingUser.role} client: ${existingUser.client}\n`);
+      console.log(`[DEBUG] Callback: existingUser found ${existingUser.email} role: ${existingUser.role} client: ${existingUser.client}\n`);
       // If existing user account is active sign him in
       if (existingUser.status === "active") {
         const token = signJwt(existingUser);
-        fs.appendFileSync('auth-debug.log', `[DEBUG] Callback: returning active existingUser\n`);
+        console.log(`[DEBUG] Callback: returning active existingUser\n`);
         return res.status(201).json({
           message: "User signed in successfully",
           token,
@@ -140,7 +139,7 @@ export const handleCallback = async (req: any, res: Response) => {
       }
 
       // If it's deleted reactivate the account & sign him in
-      fs.appendFileSync('auth-debug.log', `[DEBUG] Callback: Reactivating deleted user ${existingUser._id}\n`);
+      console.log(`[DEBUG] Callback: Reactivating deleted user ${existingUser._id}\n`);
       const reactivatedUser = await updateUserAccount({
         ...existingUser,
         _id: existingUser._id, // Ensure we keep the SAME ID
@@ -149,7 +148,7 @@ export const handleCallback = async (req: any, res: Response) => {
       });
 
       const token = signJwt(reactivatedUser);
-      fs.appendFileSync('auth-debug.log', `[DEBUG] Callback: returning reactivated user ${reactivatedUser.email}\n`);
+      console.log(`[DEBUG] Callback: returning reactivated user ${reactivatedUser.email}\n`);
       return res.status(201).json({
         message: "User created successfully",
         token,
@@ -158,7 +157,7 @@ export const handleCallback = async (req: any, res: Response) => {
     }
 
     // if the user doesn't exist sign him up
-    fs.appendFileSync('auth-debug.log', `[DEBUG] Callback: User does not exist, signing up ${email}\n`);
+    console.log(`[DEBUG] Callback: User does not exist, signing up ${email}\n`);
     const { token, user } = await createUserAndToken({
       email,
       name,
@@ -166,7 +165,7 @@ export const handleCallback = async (req: any, res: Response) => {
       ...(req.body.syncData || {}),
     });
 
-    fs.appendFileSync('auth-debug.log', `[DEBUG] Callback: returning new user ${user.email} role: ${user.role} client: ${user.client}\n`);
+    console.log(`[DEBUG] Callback: returning new user ${user.email} role: ${user.role} client: ${user.client}\n`);
     return res
       .status(201)
       .json({ message: "User created successfully", token, user });
