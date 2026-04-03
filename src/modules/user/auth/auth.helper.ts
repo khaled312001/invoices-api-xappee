@@ -13,8 +13,10 @@ export const createUserAndToken = async (userData: Partial<IUser>) => {
     name: newUser.name,
     email: newUser.email,
     role: newUser.role,
-    tenant_names: newUser.tenant_names,
     status: newUser.status,
+    client: newUser.client,
+    tenant_ids: newUser.tenant_ids,
+    tenant_names: newUser.tenant_names,
   });
 
   return { token, user: newUser };

@@ -48,6 +48,9 @@ export const handleSignUp = async (
         email: reactivatedUser.email,
         role: reactivatedUser.role,
         status: reactivatedUser.status,
+        client: reactivatedUser.client,
+        tenant_ids: reactivatedUser.tenant_ids,
+        tenant_names: reactivatedUser.tenant_names,
       });
       return res.status(201).json({
         message: "User created successfully",
@@ -129,7 +132,15 @@ export const handleCallback = async (req: any, res: Response) => {
       console.log(`[DEBUG] Callback: existingUser found ${existingUser.email} role: ${existingUser.role} client: ${existingUser.client}\n`);
       // If existing user account is active sign him in
       if (existingUser.status === "active") {
-        const token = signJwt(existingUser);
+        const token = signJwt({
+          _id: existingUser._id,
+          email: existingUser.email,
+          role: existingUser.role,
+          status: existingUser.status,
+          client: existingUser.client,
+          tenant_ids: existingUser.tenant_ids,
+          tenant_names: existingUser.tenant_names,
+        });
         console.log(`[DEBUG] Callback: returning active existingUser\n`);
         return res.status(201).json({
           message: "User signed in successfully",
@@ -147,7 +158,15 @@ export const handleCallback = async (req: any, res: Response) => {
         status: "active",
       });
 
-      const token = signJwt(reactivatedUser);
+      const token = signJwt({
+        _id: reactivatedUser._id,
+        email: reactivatedUser.email,
+        role: reactivatedUser.role,
+        status: reactivatedUser.status,
+        client: reactivatedUser.client,
+        tenant_ids: reactivatedUser.tenant_ids,
+        tenant_names: reactivatedUser.tenant_names,
+      });
       console.log(`[DEBUG] Callback: returning reactivated user ${reactivatedUser.email}\n`);
       return res.status(201).json({
         message: "User created successfully",
