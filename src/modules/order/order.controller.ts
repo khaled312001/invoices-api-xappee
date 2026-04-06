@@ -28,6 +28,7 @@ import { getItemsWithSku, getOneItemWithSKU, removeOrderQuantity } from "../item
 import readline from "readline";
 import { HttpError } from "../../utils/httpError";
 import { getCarriers } from "../carrier/carrier.service";
+import { connectMongoDB } from "../../config/mongoose";
 
 
 export const handleImportOrders = async (req: Request, res: Response) => {
@@ -65,6 +66,8 @@ export const handleImportOrders = async (req: Request, res: Response) => {
 
 export const handleImportOrdersCsv = async (req: Request, res: Response) => {
   try {
+    await connectMongoDB();
+
     const file = req.file;
     if (!file) {
       throw new HttpError(400, "Please select a file.");
@@ -93,20 +96,28 @@ export const handleImportOrdersCsv = async (req: Request, res: Response) => {
     }
 
     const importedOrders = extractOrdersDataFromCsv(data);
+    console.log(`[CSV] imported: ${importedOrders.length}`);
     const filteredOrders = filterOrders(importedOrders);
-    const originalOrders =await getOriginalOrders(filteredOrders);
+    console.log(`[CSV] filtered: ${filteredOrders.length}`);
+
+    if (filteredOrders.length === 0) {
+      return res.status(201).json({ orders: [], channels: [], dateRange: { from: null, to: null } });
+    }
+
+    const originalOrders = await getOriginalOrders(filteredOrders);
     const skus = extractAllSkusFromOrders(filteredOrders);
     const items = await getItemsWithSku(skus);
     const carriers = await getCarriers();
-    const fixedOrders = await fixOrders(filteredOrders, items, carriers,originalOrders);
-    const orders = await addOrders(fixedOrders,originalOrders);
+    const fixedOrders = await fixOrders(filteredOrders, items, carriers, originalOrders);
+    const orders = await addOrders(fixedOrders, originalOrders);
 
     const { channels, dateRange } = getOrderMetaData(orders);
 
     res.status(201).json({ orders, channels, dateRange });
 
   } catch (error: any) {
-    res.status(error.status || 500).json({ message: error?.message || "No error message" });
+    console.error("[CSV upload error]", error?.message, error?.stack);
+    res.status(error.status || 500).json({ message: error?.message || "Upload failed" });
   }
 };
 
