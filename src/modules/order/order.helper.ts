@@ -473,7 +473,7 @@ export const processExcelFile = (file: Express.Multer.File): any[] => {
   const sheetName = workbook.SheetNames[0];
   const sheet = workbook.Sheets[sheetName];
   const jsonData = xlsx.utils.sheet_to_json(sheet, {
-    header: 1, defval: '', blankrows: true, raw: false, dateNF: 'd"/"m"/"yyyy'
+    header: 1, defval: '', blankrows: false, raw: false, dateNF: 'd"/"m"/"yyyy'
   });
 
   const headers = jsonData[0];
