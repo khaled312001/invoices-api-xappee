@@ -33,6 +33,7 @@ import { connectMongoDB } from "../../config/mongoose";
 
 export const handleImportOrders = async (req: Request, res: Response) => {
   try {
+    await connectMongoDB();
     const { from, to, channelIds } = req.body;
     console.log("from", from)
     console.log("to", to)
