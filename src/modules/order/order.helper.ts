@@ -10,6 +10,9 @@ import csv from "csvtojson";
 import { getOrdersWithId } from "./order.service";
 
 export const getOrderMetaData = (orders: any[]) => {
+  if (!orders || orders.length === 0) {
+    return { dateRange: { from: null, to: null }, channels: [] };
+  }
   let minDate = new Date(orders[0].purchaseDate);
   let maxDate = new Date(orders[0].purchaseDate);
 
@@ -45,7 +48,6 @@ const formatDate = (date: Date) => {
   const year = date.getFullYear();
 
   // Format the date as 'M/d/yyyy'
-  return `${day}/${month}/${year}` as string;
   return `${day}/${month}/${year}` as string;
 };
 // filters the orders data and returns the required data to store in db

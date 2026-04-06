@@ -51,7 +51,6 @@ export const handleImportOrders = async (req: Request, res: Response) => {
     const carriers = await getCarriers();
     const fixedOrders = await fixOrders(filteredOrders, items, carriers,originalOrders);
     const orders = await addOrders(fixedOrders,originalOrders);
-    console
     return res.status(201).json({ orders });
   } catch (error: any) {
     console.log(error.message)

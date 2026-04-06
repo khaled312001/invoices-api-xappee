@@ -38,7 +38,7 @@ export const handleAddOneItem = async (req: Request, res: Response) => {
   try {
     const { newItem } = req.body;
     if (!newItem) {
-      res.status(400).json({ message: "No new items provided" });
+      return res.status(400).json({ message: "No new items provided" });
     }
     const item = await addOneItem(newItem);
     res.status(201).json({ item });
@@ -55,7 +55,7 @@ export const handleGetItems = async (req: Request, res: Response) => {
   try {
     const { page, pageSize } = req.query;
     if (!page || !pageSize) {
-      res.status(400).json({ message: "Page and pageSize are required" });
+      return res.status(400).json({ message: "Page and pageSize are required" });
     }
     const user = req.user;
     const items = await getItems(Number(page), Number(pageSize), user);
@@ -73,7 +73,7 @@ export const handleSearchWithSku = async (req: Request, res: Response) => {
     const { sku } = req.params;
     const user = req.user;
     if (!sku) {
-      res.status(400).json({ message: "SKU is required" });
+      return res.status(400).json({ message: "SKU is required" });
     }
     const item = await getOneItemWithSKU(sku,user);
     return res.status(200).json({ item });
@@ -89,10 +89,9 @@ export const handleSearchWithName = async (req: Request, res: Response) => {
   try {
     const { query } = req.params;
     if (!query) {
-      res.status(400).json({ message: "SKU is required" });
+      return res.status(400).json({ message: "Query is required" });
     }
     const items = await getItemsWithName(encodeURIComponent(query));
-    console.log("itemssssssss",items);
     return res.status(200).json({ items });
   } catch (error: any) {
     res.status(500).json({
@@ -106,7 +105,7 @@ export const handleDeleteItem = async (req: Request, res: Response) => {
   try {
     const { _id } = req.params;
     if (!_id) {
-      res.status(400).json({ message: "_id is required" });
+      return res.status(400).json({ message: "_id is required" });
     }
     await deleteItem(_id);
     return res.status(200).json({ message: "item deleted" });

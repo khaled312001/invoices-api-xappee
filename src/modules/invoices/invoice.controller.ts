@@ -163,7 +163,7 @@ export const handleGetInovices = async (req: Request, res: Response) => {
     const user: any = req.user;
 
     if (!client) {
-      return res.status(200).json("no client provided");
+      return res.status(400).json({ message: "no client provided" });
     }
     if (user && user.role !== "admin" && client != user.client) {
       return res.status(401).json({ error: "Forbidden" });
@@ -172,7 +172,7 @@ export const handleGetInovices = async (req: Request, res: Response) => {
     const storageInvoices = await getStorageInvoices(client);
     return res
       .status(200)
-      .json({ invocies: { fullfillmentInvoices, storageInvoices } });
+      .json({ invoices: { fullfillmentInvoices, storageInvoices } });
   } catch (err: any) {
     res.status(500).json({ message: "something went wrong", error: err });
   }
@@ -185,9 +185,10 @@ export const handleGetInoviceById = async (req: Request, res: Response) => {
     const user: any = req.user;
     if (type === "storage") {
       const invoice = await getStorageInvoiceById(_id);
-
-      const client = await getClientWithEmail(invoice!["clientEmail"]);
-      console.log("client", client);
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      const client = await getClientWithEmail(invoice["clientEmail"]);
       if (user && user.role !== "admin" && invoice?.client != user.client) {
         return res.status(401).json({ error: "Forbidden" });
       }
@@ -232,10 +233,10 @@ export const handleUpdateInvoice = async (req: Request, res: Response) => {
 
     if (type === "storage") {
       await updateStorageInvoiceById(_id, invoice);
-      res.status(200).json("deleted");
+      res.status(200).json("updated");
     } else {
       await updateFulfillmentInvoiceById(_id, invoice);
-      res.status(200).json("deleted");
+      res.status(200).json("updated");
     }
   } catch (err: any) {
     res.status(500).json({ message: "error getting invoice", error: err });
