@@ -15,11 +15,18 @@ const PORT = process.env.PORT || 5000;
 
 app.use(logger("dev"));
 
-const allowedOrigin = process.env.ORIGIN?.replace(/\/$/, "");
+const allowedOrigin = (process.env.ORIGIN ?? "").replace(/\/$/, "");
 app.use(
   cors({
     credentials: true,
-    origin: allowedOrigin,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (server-to-server) or matching origin
+      if (!origin || !allowedOrigin || origin === allowedOrigin) {
+        callback(null, true);
+      } else {
+        callback(null, false);
+      }
+    },
   })
 );
 // app.use(express.static('public'));
