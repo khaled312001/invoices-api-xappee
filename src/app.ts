@@ -15,10 +15,11 @@ const PORT = process.env.PORT || 5000;
 
 app.use(logger("dev"));
 
+const allowedOrigin = process.env.ORIGIN?.replace(/\/$/, "");
 app.use(
   cors({
     credentials: true,
-    origin: process.env.ORIGIN,
+    origin: allowedOrigin,
   })
 );
 // app.use(express.static('public'));
