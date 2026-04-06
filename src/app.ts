@@ -15,20 +15,15 @@ const PORT = process.env.PORT || 5000;
 
 app.use(logger("dev"));
 
-const allowedOrigin = (process.env.ORIGIN ?? "").replace(/\/$/, "");
 app.use(
   cors({
     credentials: true,
-    origin: (origin, callback) => {
-      // Allow requests with no origin (server-to-server) or matching origin
-      if (!origin || !allowedOrigin || origin === allowedOrigin) {
-        callback(null, true);
-      } else {
-        callback(null, false);
-      }
-    },
+    origin: true,
+    allowedHeaders: ["Content-Type", "Authorization"],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   })
 );
+app.options("*", cors());
 // app.use(express.static('public'));
 app.use(express.static('public/uploads'));
 router.use(passport.initialize());
