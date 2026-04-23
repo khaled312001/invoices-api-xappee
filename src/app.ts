@@ -33,7 +33,19 @@ passport.use("local", passportLocalStrategyMiddleware);
 
 app.use(express.json());
 
-// MongoDB connects on first request via connectMongoDB() in each handler
+app.use("/api", async (req, res, next) => {
+  if (req.method === "OPTIONS") return next();
+
+  try {
+    await connectMongoDB();
+    return next();
+  } catch (error: any) {
+    return res.status(500).json({
+      message: "Database connection failed",
+      error: error?.message || "No error message",
+    });
+  }
+});
 
 app.use("/api", router);
 
