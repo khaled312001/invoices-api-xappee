@@ -10,6 +10,7 @@ import {
   handleUpdateStorageCharges,
   handleUpdateFulfilmentCharges,
   handleSaveInvoiceAsPdf,
+  handleGetChargesConfig,
   sendFulfilmentInvoiceEmail,
   handleAddCustomInvoice,
   handleGetCustomInvoices,
@@ -60,6 +61,7 @@ invoiceRouter.delete("/:_id",verifyAdmin, handleDeleteInvoice )
 invoiceRouter.put("/:_id",verifyAdmin, handleUpdateInvoice)
 
 invoiceRouter.post("/fulcharges",verifyAdmin, handleUpdateFulfilmentCharges);
+invoiceRouter.get("/charges-config",verifyAdmin, handleGetChargesConfig);
 invoiceRouter.get("/storage/charges",verifyAdmin, handleGetStorageFees);
 invoiceRouter.post("/storgecharges",verifyAdmin, handleUpdateStorageCharges);
 

@@ -382,6 +382,31 @@ export const handleGetStorageFees = async (req: Request, res: Response) => {
   }
 }
 
+export const handleGetChargesConfig = async (req: Request, res: Response) => {
+  try {
+    const feeDoc = await Fee.findOne().sort({ createdAt: -1 }).lean();
+    const carriers = await Carrier.find().lean();
+
+    return res.status(200).json({
+      carriers,
+      storage: feeDoc?.storage || null,
+      fees: feeDoc
+        ? {
+            handling: feeDoc.handling,
+            addionalHandling: feeDoc.addionalHandling,
+            classes: feeDoc.classes,
+            surge: feeDoc.surge,
+          }
+        : null,
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      message: "Something went wrong while getting charges config",
+      error: error?.message || "No error message",
+    });
+  }
+};
+
 export const handleUpdateStorageCharges = async (req: Request, res: Response) => {
   try {
     const { cbm, space } = req.body.newCharges;
