@@ -3,7 +3,14 @@ import { getCarriers } from "./carrier.service";
 
 export const handleGetCarriers = async (req: Request, res: Response) => {
   try {
-    const carriers = await getCarriers();
+    const carriers = (await getCarriers()).map((carrier: any) => ({
+      ...carrier.toJSON(),
+      services: (carrier.services || []).map((service: any) => ({
+        ...service,
+        charges: service?.charges || {},
+      })),
+    }));
+
     res.status(200).json({ carriers });
   } catch (error: any) {
     res.status(500).json({

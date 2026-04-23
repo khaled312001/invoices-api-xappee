@@ -51,6 +51,7 @@ invoiceRouter.get("/custom-invoices", handleGetCustomInvoices);
 invoiceRouter.get("/custom-invoice/:_id", handleGetCustomInvoiceById);
 invoiceRouter.put("/custom-invoice/:_id",verifyAdmin, handleUpdateCustomInvoice)
 invoiceRouter.delete("/custom-invoice/:_id",verifyAdmin, handleDeleteCustomInvoice)
+invoiceRouter.get("/charges-config",verifyAdmin, handleGetChargesConfig);
 invoiceRouter.get("/storage/generate/:clientName",verifyAdmin, handleGenerateStorageInvoice);
 
 invoiceRouter.get("/:client", handleGetInovices);
@@ -61,7 +62,6 @@ invoiceRouter.delete("/:_id",verifyAdmin, handleDeleteInvoice )
 invoiceRouter.put("/:_id",verifyAdmin, handleUpdateInvoice)
 
 invoiceRouter.post("/fulcharges",verifyAdmin, handleUpdateFulfilmentCharges);
-invoiceRouter.get("/charges-config",verifyAdmin, handleGetChargesConfig);
 invoiceRouter.get("/storage/charges",verifyAdmin, handleGetStorageFees);
 invoiceRouter.post("/storgecharges",verifyAdmin, handleUpdateStorageCharges);
 
