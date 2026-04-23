@@ -86,7 +86,8 @@ export const handleSignUp = async (
 };
 
 export const handleCallback = async (req: any, res: Response) => {
-  const { email, name, image } = req.body;
+  const { email, image } = req.body;
+  const name = req.body.name || req.body.displayName;
 
   try {
     let existingUser = await findUserByEmail(email);
