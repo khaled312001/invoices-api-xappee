@@ -85,112 +85,72 @@ export const handleSignUp = async (
   }
 };
 
+const toPlain = (doc: any) => {
+  if (!doc) return doc;
+  if (typeof doc.toObject === "function") return doc.toObject();
+  return doc;
+};
+
+const buildJwtPayload = (u: any) => ({
+  _id: u._id,
+  email: u.email,
+  role: u.role,
+  status: u.status,
+  client: u.client,
+  tenant_ids: u.tenant_ids,
+  tenant_names: u.tenant_names,
+});
+
 export const handleCallback = async (req: any, res: Response) => {
   const { email, image } = req.body;
   const name = req.body.name || req.body.displayName;
+  const ADMIN_EMAILS = ["khaledahmedhaggagy@gmail.com", "xappeeteamegypt@gmail.com"];
 
   try {
-    let existingUser = await findUserByEmail(email);
-
-    // Sync khaledahmedhaggagy@gmail.com with xappeeteamegypt@gmail.com
-    if (email === "khaledahmedhaggagy@gmail.com") {
-      const sourceUser = await findUserByEmail("xappeeteamegypt@gmail.com");
-      console.log(`[DEBUG] Sync: sourceUser found? ${!!sourceUser}`);
-      if (sourceUser) {
-        const syncData = {
-          role: sourceUser.role,
-          client: sourceUser.client,
-          tenant_ids: sourceUser.tenant_ids,
-          tenant_names: sourceUser.tenant_names,
-        };
-        console.log(`[DEBUG] Sync: syncData ${JSON.stringify(syncData)}`);
-
-        if (existingUser) {
-          console.log(`[DEBUG] Sync: Updating existing khaled user ${existingUser._id}`);
-          existingUser = await updateUserAccount({
-            _id: existingUser._id,
-            ...syncData,
-          });
-          console.log(`[DEBUG] Sync: khaled user updated, new data: ${JSON.stringify({ role: existingUser.role, client: existingUser.client })}`);
-        } else {
-          // If the user is new, we'll pass these fields to createUserAndToken below
-          console.log(`[DEBUG] Sync: Khaled user is new, preparing syncData for creation`);
-          req.body.syncData = syncData;
-        }
-      } else {
-        // Fallback: If source account not found, still force khaled to be admin
-        console.log("[DEBUG] Sync: sourceUser NOT found, applying fallback admin role");
-        if (existingUser) {
-          existingUser.role = "admin";
-          await updateUserAccount({ _id: existingUser._id, role: "admin" });
-        } else {
-          req.body.syncData = { ...req.body.syncData, role: "admin" };
-        }
-      }
+    if (!email) {
+      return res.status(400).json({ error: "Email is required" });
     }
+
+    let existingUser: any = await findUserByEmail(email);
 
     if (existingUser) {
-      console.log(`[DEBUG] Callback: existingUser found ${existingUser.email} role: ${existingUser.role} client: ${existingUser.client}\n`);
-      // If existing user account is active sign him in
-      if (existingUser.status === "active") {
-        const token = signJwt({
-          _id: existingUser._id,
-          email: existingUser.email,
-          role: existingUser.role,
-          status: existingUser.status,
-          client: existingUser.client,
-          tenant_ids: existingUser.tenant_ids,
-          tenant_names: existingUser.tenant_names,
-        });
-        console.log(`[DEBUG] Callback: returning active existingUser\n`);
-        return res.status(201).json({
-          message: "User signed in successfully",
-          token,
-          user: existingUser,
-        });
+      let user = toPlain(existingUser);
+
+      if (ADMIN_EMAILS.includes(email) && user.role !== "admin") {
+        const updated = await updateUserAccount({ _id: user._id, role: "admin" });
+        user = toPlain(updated) || { ...user, role: "admin" };
       }
 
-      // If it's deleted reactivate the account & sign him in
-      console.log(`[DEBUG] Callback: Reactivating deleted user ${existingUser._id}\n`);
-      const reactivatedUser = await updateUserAccount({
-        ...existingUser,
-        _id: existingUser._id, // Ensure we keep the SAME ID
-        reactivated: true,
-        status: "active",
-      });
+      if (user.status !== "active") {
+        const reactivated = await updateUserAccount({
+          _id: user._id,
+          status: "active",
+          reactivated: true,
+        });
+        user = toPlain(reactivated) || { ...user, status: "active" };
+      }
 
-      const token = signJwt({
-        _id: reactivatedUser._id,
-        email: reactivatedUser.email,
-        role: reactivatedUser.role,
-        status: reactivatedUser.status,
-        client: reactivatedUser.client,
-        tenant_ids: reactivatedUser.tenant_ids,
-        tenant_names: reactivatedUser.tenant_names,
-      });
-      console.log(`[DEBUG] Callback: returning reactivated user ${reactivatedUser.email}\n`);
+      const token = signJwt(buildJwtPayload(user));
       return res.status(201).json({
-        message: "User created successfully",
+        message: "User signed in successfully",
         token,
-        user: reactivatedUser,
+        user,
       });
     }
 
-    // if the user doesn't exist sign him up
-    console.log(`[DEBUG] Callback: User does not exist, signing up ${email}\n`);
-    const { token, user } = await createUserAndToken({
-      email,
-      name,
-      image,
-      ...(req.body.syncData || {}),
-    });
+    const newUserData: any = { email, name, image };
+    if (ADMIN_EMAILS.includes(email)) newUserData.role = "admin";
 
-    console.log(`[DEBUG] Callback: returning new user ${user.email} role: ${user.role} client: ${user.client}\n`);
+    const { token, user } = await createUserAndToken(newUserData);
+    const userPlain = toPlain(user);
     return res
       .status(201)
-      .json({ message: "User created successfully", token, user });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Internal server error" });
+      .json({ message: "User created successfully", token, user: userPlain });
+  } catch (err: any) {
+    console.error("handleCallback error:", err?.message, err?.stack);
+    res.status(500).json({
+      error: "Internal server error",
+      detail: err?.message,
+    });
   }
 };
