@@ -48,7 +48,7 @@ export const getOrders = async (
 
 export const getOriginalOrders = async (orders: IOrder[]) => {
   return await Order.find({
-    id: { $in: orders.map((order) => order.id) },
+    selroOrderId: { $in: orders.map((order) => order.selroOrderId) },
   });
 }
 
@@ -56,14 +56,13 @@ export const addOrders = async (orders: IOrder[],originalOrders: IOrder[]) => {
   if (orders.length === 0) return [];
 
   // Fetch existing orders to preserve `quantityPurchased`
-
-
+  // Index by selroOrderId since that's the unique identifier from Selro
   const existingOrderMap = new Map(
-    originalOrders.map((order) => [order.id, order])
+    originalOrders.map((order) => [order.selroOrderId, order])
   );
 
   const bulkOps = orders.map((order) => {
-    const existingOrder = existingOrderMap.get(order.id);
+    const existingOrder = existingOrderMap.get(order.selroOrderId);
 
     const channelSales = order.channelSales.map((newSale) => {
       const existingSale =
@@ -81,7 +80,7 @@ export const addOrders = async (orders: IOrder[],originalOrders: IOrder[]) => {
 
     return {
       updateOne: {
-        filter: { id: order.id }, // Match the document by `id`
+        filter: { selroOrderId: order.selroOrderId }, // Match by unique selroOrderId
         update: {
           $set: orderToUpdate,
         },
@@ -98,7 +97,7 @@ export const addOrders = async (orders: IOrder[],originalOrders: IOrder[]) => {
 
   // Fetch and return the updated orders from the database
   const updatedOrders = await Order.find({
-    id: { $in: orders.map((order) => order.id) },
+    selroOrderId: { $in: orders.map((order) => order.selroOrderId) },
   });
 
   return updatedOrders;
