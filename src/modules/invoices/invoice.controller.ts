@@ -31,6 +31,7 @@ import { getFees, getStorageFees } from "../fee/fee.service";
 import { Fee } from "../fee/fee.model";
 import path from "path";
 import fs from 'fs';
+import os from 'os';
 import nodemailer from 'nodemailer';
 import { CustomInvoice } from "./invoice.model";
 
@@ -435,7 +436,7 @@ export const sendFulfilmentInvoiceEmail = async (req: Request, res: Response) =>
 
 
     const pdfFileName = `Invoice_${invoice._id}.pdf`; // Adjust the naming convention if needed
-    const pdfFilePath = path.join(process.cwd(), 'public/invoices', pdfFileName);
+    const pdfFilePath = path.join(os.tmpdir(), pdfFileName);
 
     // Send email
     let info = await transporter.sendMail({
