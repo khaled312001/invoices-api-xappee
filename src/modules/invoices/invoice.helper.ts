@@ -187,7 +187,7 @@ export const getPostCode = (postCode: string) => {
 // };
 
 export const getItemStock = async (sku: string) => {
-  const url = `${process.env.SELRO_API_ENDPOINT}/stock?secret=${process.env.SELRO_API_SECRET}&key=${process.env.SELRO_API_KEY}&sku=${sku}`;
+  const url = `${process.env.SELRO_API_ENDPOINT}/stock?secret=${process.env.SELRO_API_SECRET}&key=${process.env.SELRO_API_KEY}&sku=${encodeURIComponent(sku)}`;
 
   const res = await fetch(url);
   if (!res.ok) {
@@ -236,58 +236,61 @@ export const getItemStock = async (sku: string) => {
 // };
 
 
+const toNumber = (value: any, fallback = 0) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const getBillableQuantity = (qty: any) => Math.max(0, toNumber(qty));
+
+const getClientText = (client: any) =>
+  Array.isArray(client) ? client.join(" ") : String(client || "");
+
+const getStorageDimensions = (item: any) => {
+  const { width, length, height, client, boxWidth, boxLength, boxHeight } = item;
+  const clientText = getClientText(client).toLowerCase();
+  const hasBoxDimensions =
+    toNumber(boxWidth) > 0 && toNumber(boxLength) > 0 && toNumber(boxHeight) > 0;
+  const useBoxDimensions =
+    hasBoxDimensions &&
+    (clientText.includes("mossodor") || clientText.includes("prime footwear"));
+
+  return {
+    w: useBoxDimensions ? toNumber(boxWidth) : toNumber(width),
+    l: useBoxDimensions ? toNumber(boxLength) : toNumber(length),
+    h: useBoxDimensions ? toNumber(boxHeight) : toNumber(height),
+  };
+};
+
 const calculateTotalItemCBM = (items: any[]) => {
-  // Sum up the item_CBM for all items
-  const totalItemCBM = items.reduce((total, item) => {
-    const { width, length, height, client, boxWidth, boxLength, boxHeight, qty } = item;
+  return items.reduce((total, item) => {
+    const { w, l, h } = getStorageDimensions(item);
+    const qty = getBillableQuantity(item.qty);
 
-    let w, l, h;
-
-    // Use box dimensions for certain clients if available, otherwise fallback to item dimensions
-    if ((client.includes("mossodor") || client.includes("Prime Footwear")) && boxWidth && boxLength && boxHeight) {
-      w = boxWidth;
-      l = boxLength;
-      h = boxHeight;
-    } else {
-      w = width;
-      l = length;
-      h = height;
-    }
-
-    // If any required dimension or quantity is missing, skip the item
     if (!w || !l || !h || !qty) {
-      return total; // Don't add to total if the item is missing dimensions or quantity
+      return total;
     }
 
-    // Calculate the item CBM (Cubic Meters)
-    const item_CBM = (w * l * h) / 1000000; // Convert from cubic cm to cubic meters (1,000,000 cm³ in a m³)
-
-    // Add the item CBM to the total, multiplying by the quantity
-    return total + item_CBM * qty;
-  }, 0); // Start with a total of 0
-
-  return totalItemCBM;
+    return total + (w * l * h * qty) / 1000000;
+  }, 0);
 };
 
 async function importItemBySku(
   sku: string
 ): Promise<any[]> {
   try {
-    const url = `${process.env.SELRO_API_ENDPOINT}/product?secret=${process.env.SELRO_API_SECRET}&key=${process.env.SELRO_API_KEY}&sku=${sku}`;
-
-    //const response = await fetch(url);
-
-const response = await fetch(url);
+    const url = `${process.env.SELRO_API_ENDPOINT}/product?secret=${process.env.SELRO_API_SECRET}&key=${process.env.SELRO_API_KEY}&sku=${encodeURIComponent(sku)}`;
+    const response = await fetch(url);
 
     if (!response.ok) {
-      console.log("sku", sku);
       throw new Error(`Failed to fetch item`);
     }
     const data = (await response.json()) as any;
 
-    return data.products as any[];
+    if (Array.isArray(data.products)) return data.products as any[];
+    return data.product ? [data.product] : [];
   } catch (e:any) {
-    console.log(e)
+    console.log(`Failed to fetch Selro product for SKU ${sku}:`, e.message);
     return [];
   }
 
@@ -328,12 +331,13 @@ export const generateStorageInvoice = async (items: IItem[], isclientInvoicesFou
       const chunk = items.slice(i, i + chunkSize);
       await Promise.all(
         chunk.map(async (item) => {
+          const dbQty = getBillableQuantity(item.qty);
           const importedItem = await fetchWithRetry(item.sku);
-          if (importedItem && importedItem.length > 0) {
-            item.qty = importedItem[0]["qty"];
-          } else {
-            item.qty = 0;
-          }
+          const selroQty = importedItem?.[0]?.qty;
+          item.qty =
+            selroQty === undefined || selroQty === null
+              ? dbQty
+              : getBillableQuantity(selroQty);
         })
       );
     }
@@ -342,23 +346,17 @@ export const generateStorageInvoice = async (items: IItem[], isclientInvoicesFou
   const total_item_cbm = calculateTotalItemCBM(items);
   console.log("total_item_cbm", total_item_cbm);
 
-  const applyMinimumCharge = items.length > 0 && total_item_cbm <= 2;
+  const applyMinimumCharge = total_item_cbm > 0 && total_item_cbm <= 2;
   const cbmMultiplier = applyMinimumCharge ? (2 / (total_item_cbm || 1)) : 1;
 
   for (const item of items) {
-    // Instead of calculateStorageFee handling the 2 CBM logic weirdly, we do it properly
-    const { width, length, height, qty, client, boxWidth, boxLength, boxHeight } = item;
-    let w, l, h;
-    
-    if ((client.includes("mossodor") || client.includes("Prime Footwear")) && boxWidth && boxLength && boxHeight) {
-      w = boxWidth; l = boxLength; h = boxHeight;
-    } else {
-      w = width; l = length; h = height;
-    }
+    const { w, l, h } = getStorageDimensions(item);
+    const qty = getBillableQuantity(item.qty);
+    item.qty = qty;
 
-    if (!w || !l || !h || !qty) {
-      StorageInvoicePerItem[item.sku] = { ...item, item_CBM: 0, total_CBM: 0, ECM: 0, weeklyFee: 0, montlyFee: 0, problem: true };
-      continue;
+    if (!w || !l || !h) {
+       StorageInvoicePerItem[item.sku] = { ...item, item_CBM: 0, total_CBM: 0, ECM: 0, weeklyFee: 0, montlyFee: 0, monthlyFee: 0, problem: qty > 0 };
+       continue;
     }
 
     const item_CBM = (w * l * h) / 1000000;
@@ -376,7 +374,7 @@ export const generateStorageInvoice = async (items: IItem[], isclientInvoicesFou
     const weeklyFee = ECM * storage.cbm;
     const montlyFee = weeklyFee * 4;
 
-    const storagePerItem = { ...item, item_CBM, total_CBM, ECM, weeklyFee, montlyFee };
+    const storagePerItem = { ...item, item_CBM, total_CBM, ECM, weeklyFee, montlyFee, monthlyFee: montlyFee };
     StorageInvoicePerItem[item.sku] = storagePerItem;
     
     weeklySubTotal += storagePerItem.weeklyFee || 0;

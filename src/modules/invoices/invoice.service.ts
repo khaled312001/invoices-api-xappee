@@ -22,10 +22,12 @@ const findFulfillmentInvoiceByRange = async (dateRange: {
 const findStorageInvoiceByRange = async (dateRange: {
   from: string;
   to: string;
+  client: string;
 }) => {
   return await StorageInvoiceModel.findOne({
     from: dateRange.from,
     to: dateRange.to,
+    client: dateRange.client,
   });
 };
 
@@ -83,6 +85,7 @@ export const addNewStorageInvoice = async (
   const existingInvoice = (await findStorageInvoiceByRange({
     from,
     to,
+    client,
   })) as IStorageInvoice;
   if (existingInvoice) await deleteStorageInvoiceById(existingInvoice._id);
 
