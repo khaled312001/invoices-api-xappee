@@ -360,16 +360,9 @@ export const generateStorageInvoice = async (items: IItem[], isclientInvoicesFou
   const storageFeesDoc = await getStorageFees() as any;
   const storage = storageFeesDoc?.storage || { cbm: 2.35, space: 1.35 };
 
-  if (isclientInvoicesFound) {
-    await Promise.all(items.map(async (item) => {
-      const importedItem = await fetchWithRetry(item.sku);
-      if (importedItem.length > 0) {
-        item.qty = importedItem[0]["qty"];
-      } else {
-        item.qty = 0;
-      }
-    }));
-  }
+  // qty is sourced from the items collection; the per-SKU Selro refetch
+  // is removed because it issues one external HTTP request per item and
+  // exceeds the Vercel function timeout for clients with many items.
 
   const total_item_cbm = calculateTotalItemCBM(items);
   console.log("total_item_cbm", total_item_cbm);
