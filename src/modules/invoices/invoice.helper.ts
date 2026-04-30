@@ -357,41 +357,37 @@ export const generateStorageInvoice = async (items: IItem[], isclientInvoicesFou
   let monthlySubtotal = 0;
   let totalStorageSpace = 0;
 
-  const total_item_cbm = calculateTotalItemCBM(items);
-  console.log("total_item_cbm", total_item_cbm)
-  // fs.appendFile('my-log-file.log',"total_item_cbm "+total_item_cbm, (err:any) => {
-  //   if (err) throw err;
-  //   console.log('Log message saved to my-log-file.log');
-  // });
-  const { storage } = (await getStorageFees()) as any;
+  const storageFeesDoc = await getStorageFees() as any;
+  const storage = storageFeesDoc?.storage || { cbm: 2.35, space: 1.35 };
 
-  for (const item of items) {
-    if (isclientInvoicesFound) {
-     // const importedItem = await importItemBySku(item.sku) as any;
-     const importedItem = await fetchWithRetry(item.sku);
+  if (isclientInvoicesFound) {
+    await Promise.all(items.map(async (item) => {
+      const importedItem = await fetchWithRetry(item.sku);
       if (importedItem.length > 0) {
         item.qty = importedItem[0]["qty"];
       } else {
-        item.qty = 0
+        item.qty = 0;
       }
-      // fs.appendFile('my-log-file.log'," item "+item.sku, (err:any) => {
-      //   if (err) throw err;
-      //   console.log('Log message saved to my-log-file.log');
-      // });
-    }
-    const storagePerItem = await calculateStorageFee(item,total_item_cbm,storage);
+    }));
+  }
+
+  const total_item_cbm = calculateTotalItemCBM(items);
+  console.log("total_item_cbm", total_item_cbm);
+
+  for (const item of items) {
+    const storagePerItem = await calculateStorageFee(item, total_item_cbm, storage);
     StorageInvoicePerItem[item.sku] = storagePerItem;
     weeklySubTotal += storagePerItem.weeklyFee || 0;
     monthlySubtotal += storagePerItem.montlyFee || 0;
     totalStorageSpace += storagePerItem.ECM || 0;
   }
 
-    if (total_item_cbm <= 2) {
-      // If total CBM is less than or equal to 2, distribute fees evenly across items
-      weeklySubTotal = weeklySubTotal / items.length;
-      monthlySubtotal = monthlySubtotal / items.length;
-      totalStorageSpace = totalStorageSpace / items.length;
-    }
+  if (items.length > 0 && total_item_cbm <= 2) {
+    // If total CBM is less than or equal to 2, distribute fees evenly across items
+    weeklySubTotal = weeklySubTotal / items.length;
+    monthlySubtotal = monthlySubtotal / items.length;
+    totalStorageSpace = totalStorageSpace / items.length;
+  }
 
   return {
     StorageInvoicePerItem,

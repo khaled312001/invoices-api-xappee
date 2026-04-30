@@ -97,16 +97,14 @@ export const handleGenerateStorageInvoice = async (
   try {
     const { clientName } = req.params;
     const { from, to } = req.query;
-    fs.appendFile('my-log-file.log', "innnn ", (err: any) => {
-      if (err) throw err;
-      console.log('Log message saved to my-log-file.log');
-    });
+    console.log("Generating storage invoice for:", clientName, "from:", from, "to:", to);
+
     if (!from || !to || !clientName)
       return res.status(400).json("date range is required");
 
     const client = await getClientWithName(clientName);
     if (!client) return res.status(400).json("client not found");
-    const oldStorageInvoices = await getStorageInvoicesCount(client.name);
+    
     const storageInvoices = await getStorageInvoicesCount(client.name);
     const items = await getItemsWithClient(clientName);
 
@@ -118,8 +116,8 @@ export const handleGenerateStorageInvoice = async (
     } = await generateStorageInvoice(items, storageInvoices.exists);
 
     const invoice = await addNewStorageInvoice(
-      from,
-      to,
+      from as string,
+      to as string,
       clientName,
       client.email,
       client.address ?? '',
@@ -142,18 +140,14 @@ export const handleGenerateStorageInvoice = async (
       totalStorageSpace,
       createdAt: invoice.createdAt,
       items: invoice.items,
-      storageStartMonth: oldStorageInvoices.exists
+      storageStartMonth: storageInvoices.exists
     });
   } catch (err: any) {
-    fs.appendFile('my-log-file.log', "error storage " + err.message + "\n", (err: any) => {
-      if (err) throw err;
-      console.log('Log message saved to my-log-file.log');
-    });
-    console.log(err.message);
+    console.error("error storage:", err.message);
 
     return res
       .status(500)
-      .json({ message: "somethign went worng.", error: err });
+      .json({ message: "Something went wrong.", error: err });
   }
 };
 
@@ -183,18 +177,34 @@ export const handleGetInoviceById = async (req: Request, res: Response) => {
     const { _id } = req.params;
     const { type } = req.query;
     const user: any = req.user;
+
     if (type === "storage") {
       const invoice = await getStorageInvoiceById(_id);
       if (!invoice) {
         return res.status(404).json({ message: "Invoice not found" });
       }
-      const client = await getClientWithEmail(invoice["clientEmail"]);
-      if (user && user.role !== "admin" && invoice?.client != user.client) {
+
+      if (user && user.role !== "admin" && invoice.client !== user.client) {
         return res.status(401).json({ error: "Forbidden" });
       }
-      const oldStorageInvoices = await getStorageInvoicesCount(client!.name);
-      res.status(200).json({ invoice: { ...invoice, storageStartMonth: oldStorageInvoices.exists } });
 
+      const StorageInvoicePerItem: Record<string, any> = {};
+      if (invoice.items && Array.isArray(invoice.items)) {
+        invoice.items.forEach((item: any) => {
+          StorageInvoicePerItem[item.sku] = item;
+        });
+      }
+
+      const client = await getClientWithEmail(invoice.clientEmail);
+      const exists = client ? (await getStorageInvoicesCount(client.name)).exists : false;
+
+      res.status(200).json({
+        invoice: {
+          ...invoice,
+          StorageInvoicePerItem,
+          storageStartMonth: exists
+        }
+      });
     } else {
       const invoice = await getFulfillmentInvoiceById(_id);
       if (user && user.role !== "admin" && invoice?.client != user.client) {
@@ -202,8 +212,8 @@ export const handleGetInoviceById = async (req: Request, res: Response) => {
       }
       res.status(200).json({ invoice });
     }
-
   } catch (err: any) {
+    console.error("Error getting invoice by ID:", err.message);
     res.status(500).json({ message: "error getting invoice", error: err });
   }
 };
@@ -221,7 +231,7 @@ export const handleDeleteInvoice = async (req: Request, res: Response) => {
       res.status(200).json("deleted");
     }
   } catch (err: any) {
-    res.status(500).json({ message: "error getting invoice", error: err });
+    res.status(500).json({ message: "error deleting invoice", error: err });
   }
 };
 
@@ -239,63 +249,14 @@ export const handleUpdateInvoice = async (req: Request, res: Response) => {
       res.status(200).json("updated");
     }
   } catch (err: any) {
-    res.status(500).json({ message: "error getting invoice", error: err });
+    res.status(500).json({ message: "error updating invoice", error: err });
   }
 };
 
-// export const handleUpdateFulfilmentCharges = async (req: Request, res: Response) => {
-//   try {
-//     console.log("req", req.body)
-//     const { newCharges } = req.body;
-// console.log("newCharges",newCharges)
-//     // Iterate over each carrier in the formState
-//     for (const carrierName in newCharges) {
-//       const carrierServices = newCharges[carrierName];
-
-//       if (carrierName === "parcelforce" && carrierServices.discount) {
-//         const discount = parseFloat(carrierServices.discount);
-//         if (!isNaN(discount) && discount >= 0) {
-//           console.log(carrierName, "discount", discount);
-//           // Update the discount for ParcelForce
-//           await Carrier.updateOne(
-//             { name: carrierName },
-//             { $set: { discount: discount } }
-//           );
-//         }
-//       }
-
-//       // Iterate over each service in the carrier
-//       for (const serviceName in carrierServices) {
-//         const charges = carrierServices[serviceName];
-//         const numericCharges: any = {};
-//         for (const weight in charges) {
-//           const numericValue = parseFloat(charges[weight]);
-//           if (!isNaN(numericValue) && numericValue > 0) {
-//             numericCharges[weight] = numericValue;
-//           }
-//         }
-//         console.log(carrierName, serviceName, "numericCharges", numericCharges)
-//         // Update the charges for the specific service within the carrier
-//         await Carrier.updateOne(
-//           { name: carrierName, 'services.name': serviceName },
-//           { $set: { 'services.$.charges': numericCharges } }
-//         );
-//       }
-//     }
-
-//     res.status(201).json({ message: 'Charges updated successfully' });
-
-//   } catch (error: any) {
-//     res.status(500).json({
-//       message: "Somehting went wrong while updating charges",
-//       error: error?.message || "No error message",
-//     });
-//   }
-// };
 const isEmpty = function (obj: any) {
-  console.log("obj", obj)
   return Object.keys(obj).length === 0;
 };
+
 export const handleUpdateFulfilmentCharges = async (req: Request, res: Response) => {
   try {
     const { newCharges } = req.body;
@@ -441,24 +402,7 @@ export const handleUpdateStorageCharges = async (req: Request, res: Response) =>
 
 export const handleSaveInvoiceAsPdf = async (req: Request, res: Response) => {
   try {
-    // const form = new formidable.IncomingForm();
-    // form.parse(req, (err:any, fields:any, files:any) => {
-    //   if (err) {
-    //     console.log(err.message)
-    //     return res.status(500).json({ error: 'Failed to parse form data' });
-    //   }
-    //   // Define the path where the file should be saved
-    //   //const filePath = path.join(process.env.SERVER!, 'public', files.pdf.originalFilename);
-
-    //   // Move the uploaded file to the public folder
-    //   // fs.rename(files.pdf.filepath, filePath, (err) => {
-    //   //   if (err) {
-    //   //     return res.status(500).json({ error: 'Failed to save PDF' });
-    //   //   }
-
     res.status(200).json({ message: 'PDF saved successfully!' });
-    // });
-    // });
   } catch (error: any) {
     res.status(500).json({
       message: "Something went wrong while saving the PDF",
@@ -475,8 +419,6 @@ export const sendFulfilmentInvoiceEmail = async (req: Request, res: Response) =>
     if (!userEmail || !invoice) {
       return res.status(400).json({ error: "Missing required fields" });
     }
-
-
 
     // Create a Nodemailer transporter
     let transporter = nodemailer.createTransport({
@@ -519,18 +461,12 @@ export const sendFulfilmentInvoiceEmail = async (req: Request, res: Response) =>
 
 
     res.status(200).json({ messageId: info.messageId });
-    // return NextResponse.json({ success: true, messageId: info.messageId });
   } catch (err: any) {
     console.error("Error sending email:", err);
     res.status(500).json({
       message: "Failed to send email",
       error: err?.message || "No error message",
     });
-
-    // return NextResponse.json(
-    //   { error: "Failed to send email" },
-    //   { status: 500 }
-    // );
   }
 }
 
@@ -555,11 +491,6 @@ export const handleAddCustomInvoice = async (
 export const handleGetCustomInvoices = async (req: Request, res: Response) => {
   try {
     const user = req.user;
-    // const { page, pageSize } = req.query;
-    // if (!page || !pageSize) {
-    //   res.status(400).json({ message: "Page and pageSize are required" });
-    // }
-    // const invoices = await getCustomInvoices(Number(page), Number(pageSize));
     const invoices = await getCustomInvoices(user);
     console.log("fetchccccccc", invoices);
     return res.status(200).json({ invoices });
@@ -580,8 +511,6 @@ export const handleGetCustomInvoiceById = async (req: Request, res: Response) =>
       if (user && user.role !== "admin" && invoice.client != user.client) {
         return res.status(401).json({ error: "Forbidden" });
       }
-      // Add the calculation methods to the invoice object
-      // Call external calculation functions
       const subtotal = calculateSubtotal(invoice);
       const total = calculateTotal(invoice);
       const itemsNo = invoice.items.reduce((total, item) => total + item.qty, 0).toFixed(2);
@@ -592,15 +521,10 @@ export const handleGetCustomInvoiceById = async (req: Request, res: Response) =>
     } else {
       res.status(404).json({ message: "No Found Invoice" });
     }
-
-
   } catch (err: any) {
     res.status(500).json({ message: "error getting invoice", error: err });
   }
 };
-
-
-
 
 export const handleUpdateCustomInvoice = async (req: Request, res: Response) => {
   try {
@@ -613,7 +537,6 @@ export const handleUpdateCustomInvoice = async (req: Request, res: Response) => 
     res.status(500).json({ message: "error getting invoice", error: err });
   }
 };
-
 
 export const handleDeleteCustomInvoice = async (req: Request, res: Response) => {
   try {
