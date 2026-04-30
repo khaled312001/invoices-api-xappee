@@ -235,44 +235,6 @@ export const getItemStock = async (sku: string) => {
 //   return { ...item, item_CBM, total_CBM, ECM, weeklyFee, montlyFee };
 // };
 
-const calculateStorageFee = async (item: IItem, total_item_cbm: number, storage: any) => {
-  const { width, length, height, qty, client, boxWidth, boxLength, boxHeight } = item;
-  
-  let w, l, h;
-
-  if ((client.includes("mossodor") || client.includes("Prime Footwear")) && boxWidth && boxLength && boxHeight) {
-    w = boxWidth;
-    l = boxLength;
-    h = boxHeight;
-  } else {
-    w = width;
-    l = length;
-    h = height;
-  }
-
-  if (!w || !l || !h || !qty) {
-    return {
-      ...item,
-      item_CBM: 0,
-      total_CBM: 0,
-      ECM: 0,
-      weeklyFee: 0,
-      montlyFee: 0,
-      problem: true,
-    };
-  }
-
-  const item_CBM = (w * l * h) / 1000000; // size cbm
-  let total_CBM = item_CBM * qty;
-
-  if (total_item_cbm <= 2 && total_CBM < 2) total_CBM = 2;
-
-  const ECM = total_CBM * storage.space; // effective cubic meter ( space utilized by the item and the space around it)
-  const weeklyFee = ECM * storage.cbm;
-  const montlyFee = weeklyFee * 4;
-
-  return { ...item, item_CBM, total_CBM, ECM, weeklyFee, montlyFee };
-};
 
 const calculateTotalItemCBM = (items: any[]) => {
   // Sum up the item_CBM for all items
@@ -360,26 +322,66 @@ export const generateStorageInvoice = async (items: IItem[], isclientInvoicesFou
   const storageFeesDoc = await getStorageFees() as any;
   const storage = storageFeesDoc?.storage || { cbm: 2.35, space: 1.35 };
 
-  // qty is sourced from the items collection; the per-SKU Selro refetch
-  // is removed because it issues one external HTTP request per item and
-  // exceeds the Vercel function timeout for clients with many items.
+  if (isclientInvoicesFound) {
+    const chunkSize = 50;
+    for (let i = 0; i < items.length; i += chunkSize) {
+      const chunk = items.slice(i, i + chunkSize);
+      await Promise.all(
+        chunk.map(async (item) => {
+          const importedItem = await fetchWithRetry(item.sku);
+          if (importedItem && importedItem.length > 0) {
+            item.qty = importedItem[0]["qty"];
+          } else {
+            item.qty = 0;
+          }
+        })
+      );
+    }
+  }
 
   const total_item_cbm = calculateTotalItemCBM(items);
   console.log("total_item_cbm", total_item_cbm);
 
+  const applyMinimumCharge = items.length > 0 && total_item_cbm <= 2;
+  const cbmMultiplier = applyMinimumCharge ? (2 / (total_item_cbm || 1)) : 1;
+
   for (const item of items) {
-    const storagePerItem = await calculateStorageFee(item, total_item_cbm, storage);
+    // Instead of calculateStorageFee handling the 2 CBM logic weirdly, we do it properly
+    const { width, length, height, qty, client, boxWidth, boxLength, boxHeight } = item;
+    let w, l, h;
+    
+    if ((client.includes("mossodor") || client.includes("Prime Footwear")) && boxWidth && boxLength && boxHeight) {
+      w = boxWidth; l = boxLength; h = boxHeight;
+    } else {
+      w = width; l = length; h = height;
+    }
+
+    if (!w || !l || !h || !qty) {
+      StorageInvoicePerItem[item.sku] = { ...item, item_CBM: 0, total_CBM: 0, ECM: 0, weeklyFee: 0, montlyFee: 0, problem: true };
+      continue;
+    }
+
+    const item_CBM = (w * l * h) / 1000000;
+    let base_total_CBM = item_CBM * qty;
+    
+    // If we apply minimum charge, we scale up the item's CBM to its proportion of the 2 CBM total
+    let total_CBM = applyMinimumCharge ? base_total_CBM * cbmMultiplier : base_total_CBM;
+    
+    // Fallback if total_item_cbm was exactly 0 but items exist (to avoid 0 fees when 2 CBM minimum applies)
+    if (applyMinimumCharge && total_item_cbm === 0) {
+       total_CBM = 2 / items.length;
+    }
+
+    const ECM = total_CBM * storage.space;
+    const weeklyFee = ECM * storage.cbm;
+    const montlyFee = weeklyFee * 4;
+
+    const storagePerItem = { ...item, item_CBM, total_CBM, ECM, weeklyFee, montlyFee };
     StorageInvoicePerItem[item.sku] = storagePerItem;
+    
     weeklySubTotal += storagePerItem.weeklyFee || 0;
     monthlySubtotal += storagePerItem.montlyFee || 0;
     totalStorageSpace += storagePerItem.ECM || 0;
-  }
-
-  if (items.length > 0 && total_item_cbm <= 2) {
-    // If total CBM is less than or equal to 2, distribute fees evenly across items
-    weeklySubTotal = weeklySubTotal / items.length;
-    monthlySubtotal = monthlySubtotal / items.length;
-    totalStorageSpace = totalStorageSpace / items.length;
   }
 
   return {
